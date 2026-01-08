@@ -1,0 +1,94 @@
+// sentinelx/grpc/inference.proto
+syntax = "proto3";
+
+package sentinelx.grpc.v1;
+
+// -------------------------------
+// BACKWARD COMPAT SERVICE (OLD)
+// -------------------------------
+service InferenceService {
+  rpc Predict (PredictRequest) returns (PredictResponse);
+}
+
+// -------------------------------
+// NEW GATEWAY SERVICE (PHASE 5)
+// -------------------------------
+service InferenceGateway {
+  rpc Predict (PredictRequest) returns (PredictResponse);
+  rpc PredictStream (PredictRequest) returns (stream PredictUpdate);
+}
+
+// -------------------------------
+// REQUEST
+// -------------------------------
+message PredictRequest {
+  // NEW routing fields (optional for old clients)
+  string logical_model = 1;
+  string version = 2;
+  string route = 3;
+
+  // Payload: support BOTH styles
+  oneof payload {
+    // OLD style payload (compat) - cannot be repeated directly in oneof
+    Inputs inputs = 4;
+
+    // NEW MVP payload (JSON string)
+    string input_json = 5;
+  }
+
+  // NEW optional fields
+  string request_id = 6;   // allow client to pass request_id
+  int32 timeout_s = 7;     // 0 = server default
+}
+
+// wrapper because repeated cannot be inside oneof
+message Inputs {
+  repeated float inputs = 1;
+}
+
+// -------------------------------
+// RESPONSE
+// -------------------------------
+message PredictResponse {
+  // Works for BOTH old + new
+  string request_id = 1;
+
+  // NEW status fields (old clients can ignore)
+  string status = 2;       // finished|error
+  string error = 3;        // only on error
+  double total_ms = 4;
+
+  // Output: support BOTH styles
+  oneof result {
+    // OLD style output (compat)
+    Outputs outputs = 5;
+
+    // NEW JSON output
+    string output_json = 6;
+  }
+
+  // Extra metadata (nice for debugging / backwards compatibility)
+  string logical_model = 7;
+  string physical_model = 8;
+  string version = 9;
+}
+
+// wrapper because repeated cannot be inside oneof
+message Outputs {
+  repeated float outputs = 1;
+}
+
+// -------------------------------
+// STREAMING UPDATE
+// -------------------------------
+message PredictUpdate {
+  string request_id = 1;
+  string status = 2;     // queued|started|finished|error
+  string detail = 3;     // optional
+
+  // only on finished
+  string output_json = 4;
+
+  // only on error
+  string error = 5;
+}

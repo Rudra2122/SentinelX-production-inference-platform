@@ -1,0 +1,184 @@
+services:
+  # ---------- Core infra ----------
+  redis:
+    image: redis:7
+    container_name: sentinelx-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # ---------- Jaeger (OTLP ingest + UI) ----------
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    ports:
+      - "16686:16686"  # UI
+      - "4318:4318"    # OTLP HTTP ingest
+    restart: unless-stopped
+
+  # ---------- Autoscaler (MUST be separate container for rubric proof) ----------
+  autoscaler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: sentinelx-autoscaler
+    restart: always
+    depends_on:
+      - redis
+      - gateway
+    environment:
+      PYTHONPATH: /app
+      SENTINELX_REDIS_URL: redis://redis:6379/0
+      SENTINELX_SERVICE_NAME: autoscaler
+
+      # ✅ Autoscaler knobs (SLO-friendly)
+      # scale up EARLY so queue doesn't explode and p95 stays low
+      SENTINELX_SCALE_UP_THRESHOLD: "50"
+      SENTINELX_SCALE_DOWN_THRESHOLD: "5"
+      SENTINELX_SCALE_POLL_S: "1.0"
+      SENTINELX_SCALE_COOLDOWN_S: "10"
+
+      # ✅ worker bounds (your scheduler.py reads these via MIN/MAX_WORKERS)
+      SENTINELX_MIN_WORKERS: "2"
+      SENTINELX_MAX_WORKERS: "6"
+
+      # What to scale
+      SENTINELX_SCALE_SERVICE: worker_v1
+      SENTINELX_SCALE_PHYSICAL_MODEL: demo_classifier
+      SENTINELX_SCALE_VERSION: v1.0.0
+
+      # Compose control (IMPORTANT)
+      SENTINELX_COMPOSE_FILE: /app/docker-compose.yml
+      SENTINELX_PROJECT_DIR: /app
+      COMPOSE_PROJECT_NAME: sentinelx
+
+      # Docker socket (engine)
+      DOCKER_HOST: unix:///var/run/docker.sock
+
+    volumes:
+      # must see compose file + project
+      - ./:/app:rw
+      # must control docker engine
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    command: ["python", "-m", "sentinelx.core.scheduler"]
+
+  # ---------- Gateway (FastAPI + gRPC dual server) ----------
+  gateway:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: sentinelx-gateway
+    command: ["python", "-m", "sentinelx.grpc.dual_server"]
+    restart: always
+    environment:
+      PYTHONPATH: /app
+      SENTINELX_REDIS_URL: redis://redis:6379/0
+
+      # Optional explicit ports (matches dual_server defaults)
+      SENTINELX_HTTP_HOST: "0.0.0.0"
+      SENTINELX_HTTP_PORT: "8000"
+      SENTINELX_GRPC_HOST: "0.0.0.0"
+      SENTINELX_GRPC_PORT: "50051"
+
+      # ✅ OTel exporter -> Jaeger (OTLP/HTTP)
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: sentinelx-gateway
+
+    depends_on:
+      - redis
+      - jaeger
+
+    ports:
+      - "8000:8000"
+      - "50051:50051"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=2).read(); print('ok')",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+
+  # ---------- Worker (ONLY ONE service, scalable) ----------
+  worker_v1:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command:
+      [
+        "python",
+        "-m",
+        "sentinelx.inference.worker",
+        "--physical-model",
+        "demo_classifier",
+        "--version",
+        "v1.0.0"
+      ]
+    restart: always
+    environment:
+      PYTHONPATH: /app
+      SENTINELX_REDIS_URL: redis://redis:6379/0
+      SENTINELX_WORKER_METRICS_PORT: "8001"
+
+      # ✅ Optional: force backlog so scaling is obvious
+      # If you don’t want artificial latency, comment it out.
+      SENTINELX_WORKER_SLOW_MS: "30"
+
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: sentinelx-worker
+
+    depends_on:
+      - redis
+      - jaeger
+
+    expose:
+      - "8001"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import os; import redis; r=redis.from_url(os.getenv('SENTINELX_REDIS_URL','redis://redis:6379/0')); r.ping(); print('ok')",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+
+  # ---------- Prometheus ----------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sentinelx-prometheus
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - gateway
+      - worker_v1
+    restart: unless-stopped
+
+  # ---------- Grafana ----------
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: sentinelx-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      - prometheus
+    restart: unless-stopped

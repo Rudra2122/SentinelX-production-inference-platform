@@ -1,0 +1,81 @@
+groups:
+  - name: sentinelx-alerts
+    rules:
+
+      # -----------------------------------------------------
+      # SLO: p95 SUCCESS latency > 200ms (5m window)
+      # Uses status="success" so failures don't poison latency SLO
+      # -----------------------------------------------------
+      - alert: SentinelXP95LatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, logical_model, physical_model, version, route) (
+              rate(sentinelx_request_latency_seconds_bucket{route="http",status="success"}[5m])
+            )
+          ) > 0.2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SentinelX p95 latency high"
+          description: "p95 success latency > 200ms for route={{ $labels.route }} (logical={{ $labels.logical_model }}, version={{ $labels.version }})"
+
+      # -----------------------------------------------------
+      # SLO: error rate > 0.01% (5m window)  ✅ excellent threshold
+      # 0.0001 = 0.01%
+      # -----------------------------------------------------
+      - alert: SentinelXErrorRateHigh
+        expr: |
+          (
+            sum(rate(sentinelx_requests_total{status=~"timeout|error|backpressure|bad_request"}[5m]))
+            /
+            sum(rate(sentinelx_requests_total[5m]))
+          ) > 0.0001
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SentinelX error rate high"
+          description: "Error rate > 0.01% over 5m"
+
+      # -----------------------------------------------------
+      # Queue depth too high
+      # -----------------------------------------------------
+      - alert: SentinelXQueueDepthHigh
+        expr: |
+          max(sentinelx_queue_length) > 800
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SentinelX queue depth high"
+          description: "Queue depth > 800 (backpressure likely soon)"
+
+      # -----------------------------------------------------
+      # Worker heartbeat stale (no heartbeat in 30s)
+      # Requires WORKER_HEALTH_GAUGE = last heartbeat unix time
+      # -----------------------------------------------------
+      - alert: SentinelXWorkerHeartbeatStale
+        expr: |
+          absent(sentinelx_worker_health)
+          OR (time() - max(sentinelx_worker_health) > 30)
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "SentinelX worker heartbeat stale"
+          description: "No heartbeat in 30s for physical={{ $labels.physical_model }} version={{ $labels.version }}"
+
+      # -----------------------------------------------------
+      # No workers alive at all
+      # -----------------------------------------------------
+      - alert: SentinelXNoWorkers
+        expr: |
+          count(sentinelx_worker_health) == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SentinelX has no workers"
+          description: "No worker metrics are being scraped"
