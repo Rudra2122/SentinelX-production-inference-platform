@@ -12,17 +12,17 @@ At companies like Meta, NVIDIA, and Google, the hardest ML problems are not mode
 
 They are:
 
--Tail latency under burst traffic
+-  Tail latency under burst traffic
 
--Silent failures when workers die
+-  Silent failures when workers die
 
--Inefficient GPU utilization
+-  Inefficient GPU utilization
 
--Unsafe rollouts of new model versions
+-  Unsafe rollouts of new model versions
 
--Lack of observability when something breaks at 2 AM
+-  Lack of observability when something breaks at 2 AM
 
--SentinelX directly targets these problems with a production-first design.
+-  SentinelX directly targets these problems with a production-first design.
 
 ## 🏗️ High-Level Architecture
 ```
@@ -62,35 +62,35 @@ Prometheus • Grafana • OpenTelemetry • Alerts
 ## 🌟 Core Features — With Real Numbers
 ### ⚡ 1. High-Throughput Model Serving
 
--REST + async inference APIs
+-  REST + async inference APIs
 
--Optional gRPC endpoint (Triton-style)
+-  Optional gRPC endpoint (Triton-style)
 
--Supports real-time and batch-style inference
+-  Supports real-time and batch-style inference
 
--Measured throughput
+-  Measured throughput
 
--300+ requests/sec
+-  300+ requests/sec
 
--Sustained under burst load
+-  Sustained under burst load
 
--No request loss during autoscaling
+-  No request loss during autoscaling
 
 ### 📦 2. Dynamic Batching (Throughput Without Killing Latency)
 
--Per-model configurable:
+-  Per-model configurable:
 
--max_batch_size
+-  max_batch_size
 
--max_batch_wait_ms
+-  max_batch_wait_ms
 
--Measured impact
+-  Measured impact
 
 Batch Size	Throughput
 1	          ~80 RPS
 16	        ~220 RPS (+175%)
 
--Latency remained under SLO (p99 < 200 ms).
+-  Latency remained under SLO (p99 < 200 ms).
 
 ### 📈 3. Autoscaling Worker Pool (Control Plane)
 
@@ -98,71 +98,71 @@ Scales workers up and down automatically
 
 Driven by:
 
-Queue depth
+-  Queue depth
 
-Worker heartbeat health
+-  Worker heartbeat health
 
-Cooldown windows
+-  Cooldown windows
 
-Observed behavior
+-  Observed behavior
 
-Burst: 10 → 200 RPS
+-  Burst: 10 → 200 RPS
 
-Workers: 2 → 8 in < 30 seconds
+-  Workers: 2 → 8 in < 30 seconds
 
-0 SLO violations during scale-up
+-  0 SLO violations during scale-up
 
-Scales back down when load drops
+-  Scales back down when load drops
 
 ### 🩺 4. Health-Aware Routing & Fail-Fast Guarantees
 
-Workers emit heartbeats with TTL
+-  Workers emit heartbeats with TTL
 
-Gateway enforces pre-enqueue health checks
+-  Gateway enforces pre-enqueue health checks
 
-If no healthy workers exist:
+-  If no healthy workers exist:
 
-Requests fail immediately with HTTP 503
+-  Requests fail immediately with HTTP 503
 
-No silent queue buildup
+-  No silent queue buildup
 
-Tested failure modes
+-  Tested failure modes
 
-Worker crashes mid-load
+-  Worker crashes mid-load
 
-All workers unavailable
+-  All workers unavailable
 
-Redis heartbeat expiration
+-  Redis heartbeat expiration
 
 ### 🔀 5. Multi-Version Routing (A/B + Canary)
 
-Serve multiple versions of a model concurrently
+-  Serve multiple versions of a model concurrently
 
-Deterministic canary bucketing
+-  Deterministic canary bucketing
 
-Safe traffic shifting without restarts
+-  Safe traffic shifting without restarts
 
-Example
+-  Example
 
-v1.0.0 (primary)
+   v1.0.0 (primary)
 
-v1.1.0 (canary at 20%)
+   v1.1.0 (canary at 20%)
 
-Automatic fallback if canary unhealthy
+-  Automatic fallback if canary unhealthy
 
 ### 🚦 6. SLO Enforcement & Backpressure
 
-Explicit SLOs enforced in the routing layer:
+-  Explicit SLOs enforced in the routing layer:
 
-p95 latency target (e.g., < 200 ms)
+-  p95 latency target (e.g., < 200 ms)
 
-Error rate budget (< 1%)
+-  Error rate budget (< 1%)
 
-Behavior
+-  Behavior:
 
-Traffic is rejected early when system health degrades
+   Traffic is rejected early when system health degrades
 
-Backpressure prevents cascading failures
+   Backpressure prevents cascading failures
 
 ### 📊 7. Full Observability (Production-First)
 
