@@ -12,17 +12,17 @@ At companies like Meta, NVIDIA, and Google, the hardest ML problems are not mode
 
 They are:
 
-Tail latency under burst traffic
+-Tail latency under burst traffic
 
-Silent failures when workers die
+-Silent failures when workers die
 
-Inefficient GPU utilization
+-Inefficient GPU utilization
 
-Unsafe rollouts of new model versions
+-Unsafe rollouts of new model versions
 
-Lack of observability when something breaks at 2 AM
+-Lack of observability when something breaks at 2 AM
 
-SentinelX directly targets these problems with a production-first design.
+-SentinelX directly targets these problems with a production-first design.
 
 ## 🏗️ High-Level Architecture
 ```
@@ -62,35 +62,35 @@ Prometheus • Grafana • OpenTelemetry • Alerts
 ## 🌟 Core Features — With Real Numbers
 ### ⚡ 1. High-Throughput Model Serving
 
-REST + async inference APIs
+-REST + async inference APIs
 
-Optional gRPC endpoint (Triton-style)
+-Optional gRPC endpoint (Triton-style)
 
-Supports real-time and batch-style inference
+-Supports real-time and batch-style inference
 
-Measured throughput
+-Measured throughput
 
-300+ requests/sec
+-300+ requests/sec
 
-Sustained under burst load
+-Sustained under burst load
 
-No request loss during autoscaling
+-No request loss during autoscaling
 
 ### 📦 2. Dynamic Batching (Throughput Without Killing Latency)
 
-Per-model configurable:
+-Per-model configurable:
 
-max_batch_size
+-max_batch_size
 
-max_batch_wait_ms
+-max_batch_wait_ms
 
-Measured impact
+-Measured impact
 
 Batch Size	Throughput
 1	          ~80 RPS
-16	          ~220 RPS (+175%)
+16	        ~220 RPS (+175%)
 
-Latency remained under SLO (p99 < 200 ms).
+-Latency remained under SLO (p99 < 200 ms).
 
 ### 📈 3. Autoscaling Worker Pool (Control Plane)
 
