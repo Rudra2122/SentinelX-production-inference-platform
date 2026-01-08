@@ -5,8 +5,6 @@ SentinelX is a production-grade, real-time AI inference platform built to serve 
 
 Architecturally inspired by NVIDIA Triton, Google Vertex AI, AWS SageMaker Endpoints, and large-scale internal serving systems at Meta, Uber, and OpenAI, SentinelX focuses on the hard infrastructure problems of modern ML systems — not just model accuracy.
 
-Built With: FastAPI · gRPC · PyTorch · Redis · Prometheus · Grafana · OpenTelemetry
-Focus Areas: AI Infrastructure · Distributed Systems · MLOps · Reliability Engineering · Observability
 
 ## 🧠 Why This Project Matters
 
