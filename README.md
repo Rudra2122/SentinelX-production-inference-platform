@@ -262,4 +262,3 @@ python scripts/load_test.py
 **Rudra Brahmbhatt**
 MS Computer Science, Texas State University, May 2026
 ML Inference Infrastructure
-[LinkedIn](#) · [GitHub](#)
